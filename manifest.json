@@ -1,0 +1,22 @@
+{
+    "name": "gelbeseiten Scraper",
+    "description": "Scrape gelbeseiten.de",
+    "version": "1.0.0",
+    "manifest_version": 3,
+    "background": {
+        "service_worker": "./background.js"
+    },
+    "action": {
+        "default_popup": "./popup.html"
+    },
+    "permissions": [
+        "activeTab",
+        "tabs",
+        "scripting",
+        "storage",
+        "downloads"
+    ],
+    "host_permissions": [
+        "https://www.gelbeseiten.de/*"
+    ]
+}
