@@ -15,3 +15,18 @@ Scraper for gelbeseiten.de
 3. When you want to export the files click on stop/export button and select a destination.
 
 Please reload the gelbeseiten Page before a new scrape!
+
+# Output:
+```json
+[
+  {
+  "title":	"",
+  "branche":	"",
+  "address"	"",
+  "plz":	"",
+  "number":	"",
+  "url":	"",
+  "googleMaps":	"",
+  }
+]
+```
