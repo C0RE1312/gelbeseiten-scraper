@@ -22,7 +22,7 @@ Please reload the gelbeseiten Page before a new scrape!
   {
   "title":	"",
   "branche":	"",
-  "address"	"",
+  "address":	"",
   "plz":	"",
   "number":	"",
   "url":	"",
