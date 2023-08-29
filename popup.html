@@ -17,13 +17,20 @@
   <body>
     <div>
       Instructions:
-      <p><b>1. Starte eine suche auf der gelbeseiten page</b></p>
-      <p><b>2. Sobald die Seite geladen hat drücke auf Start!</b></p>
-      <p>Beispiel Url: https://www.gelbeseiten.de/suche/maler/bundesweit</p>
+      <p><b>1. Visit gelbeseiten.de and start a search</b></p>
+      <p><b>2. When the results are loaded press on Start</b></p>
+      <p>Example Url: https://www.gelbeseiten.de/suche/maler/bundesweit</p>
 
       <p>
         <button id="btn_start">Start</button>
         <button id="btn_stop" disabled>Stop & Export</button>
+      </p>
+      <p>
+        <p>Please select the output format:</p>
+        <input type="radio" id="json" name="format" value="json" checked="True">
+        <label for="json">json</label><br>
+        <input type="radio" id="csv" name="format" value="csv">
+        <label for="age2">csv</label><br>  
       </p>
       <p>
         <div>counter:</div>

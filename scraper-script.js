@@ -1,146 +1,126 @@
-let intervalId = 0
+let scrapingIntervalId = 0;
 
-async function scrape() {
-    intervalId = setInterval(async function () {
-        const gs_treffer = document.getElementById("gs_treffer")
-        for (let z of gs_treffer.children)
-            await handleItem(z)
+const executeXPathQuery = (xpathQuery) => document.evaluate(xpathQuery, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
 
-        await nextPage()
-    }, 250)
+const decodeBase64 = (base64String) => decodeURIComponent(escape(window.atob(base64String)));
+
+function extractAddressFromGoogleMapsURL(googleMapsURL) {
+  try {
+    const url = new URL(googleMapsURL);
+    const placeParam = url.pathname.split('/').pop();
+    const [_, street, postcode, city] = /(.+),\s+(\d+)\s+(.+)/.exec(decodeURIComponent(placeParam)) || [];
+    
+    return {
+      street,
+      postcode,
+      city
+    };
+  } catch (error) {
+    console.error("An error occurred while extracting the address:", error);
+    return null;
+  }
 }
 
-
-async function nextPage() {
-    const treffer_count = document.getElementById("gs_treffer").children.length
-    const next_btn = document.getElementById('mod-LoadMore--button')
-
-    if (next_btn)
-        next_btn.click()
-    else {
-        clearInterval(intervalId)
-        await send_end()
-    }
-
+async function startScraping() {
+    scrapingIntervalId = setInterval(async () => {
+        const searchResultsContainer = document.getElementById("gs_treffer");
+        for (let childElement of searchResultsContainer.children) {
+            await handleSearchResultItem(childElement);
+        }
+        await navigateToNextPage();
+    }, 250);
 }
 
-async function handleItem(ele) {
-    // get the informormations out
-    // remove the node
+async function navigateToNextPage() {
+    const nextButton = document.getElementById('mod-LoadMore--button');
+    nextButton ? nextButton.click() : clearInterval(scrapingIntervalId);
+}
 
-    ele.scrollIntoView();
-
+async function handleSearchResultItem(searchResultElement) {
+    searchResultElement.scrollIntoView();
     try {
-        let obj = {}
-        Object.assign(obj, get_address(ele.id), get_branche(ele.id), get_title(ele.id), get_number(ele.id), get_website(ele.id))
-        await send_Item(obj)
-    } catch (err) {
-        console.log(err)
+        const elementId = searchResultElement.id;
+        const scrapedData = {
+            ...extractData('mod-WebseiteKompakt__text', extractWebsiteInfo, elementId, 'span'),
+            ...extractData('mod-TelefonnummerKompakt__phoneNumber', extractPhoneNumber, elementId, 'a'),
+            ...extractData('besteBranche', extractIndustryInfo, elementId, 'p'),
+            ...extractData('__address', extractAddressInfo, elementId),
+            ...extractData('mod-Treffer__name', extractTitleInfo, elementId, 'h2')
+        };
+        await sendMessageWithData(scrapedData);
+    } catch (error) {
+        console.log(error);
     } finally {
-        ele.remove()
+        searchResultElement.remove();
     }
-    await new Promise(r => setTimeout(r, 25));
+    await new Promise(resolve => setTimeout(resolve, 25));
 }
 
-function get_website(id) {
-    const website = getElementByXpath('//article[@id="' + id + '"]//div[contains(@class, "webseiteLink")]')
-    if (website) {
-        try {
-            const url_b64 = website.getAttribute('data-webseitelink')
-            if (url_b64)
-                return { url: decode_b64(url_b64) }
-        } catch (err) { }
-    }
-    return {}
+function extractWebsiteInfo(element) {
+    const encodedWebsiteURL = element.getAttribute('data-webseitelink');
+    return encodedWebsiteURL ? { website: decodeBase64(encodedWebsiteURL) } : {};
 }
 
-function get_number(id) {
-    const num = getElementByXpath('//article[@id="' + id + '"]//a[contains(@class, "mod-TelefonnummerKompakt__phoneNumber")]')
-    if (num) {
-        try {
-            return { number: num.innerText }
-        } catch (err) { }
-    }
-    return {}
+function extractData(className, extractionFunction, elementId, tagName = 'div') {
+    const targetedElement = executeXPathQuery(`//article[@id="${elementId}"]//${tagName}[contains(@class, "${className}")]`);
+    return targetedElement ? extractionFunction(targetedElement) : {};
 }
 
-function get_branche(id) {
-    const branche = getElementByXpath('//article[@id="' + id + '"]//p[contains(@class, "besteBranche")]')
-    if (branche) {
-        try {
-            return { branche: branche.innerText }
-        } catch (err) { }
-    }
-    return {}
+function extractPhoneNumber(element) {
+    return { phoneNumber: element.innerText.trim() };
 }
 
-function get_address(id) {
-    const address = getElementByXpath('//article[@id="' + id + '"]//div[contains(@class, "__address")]')
-    if (address) {
-        try {
-            const text = address.innerText
-            const step = text.split(',')
-
-            let googleM = {}
-            let google = {}
-            try{
-                google = address.getAttribute('data-prg')
-                if(google)
-                    google = decode_b64(google)
-                    if(google)
-                        googleM = google
-
-            }catch(err){}
-            return { address: step[0], plz: step[1], googleMaps:googleM}
-        } catch (e) { }
-
-    }
-    return {}
-
+function extractIndustryInfo(element) {
+    return { industry: capitalizeFirstLetter(element.innerText.trim().toLowerCase()) };
 }
 
-function get_title(id) {
-    const title = getElementByXpath('//article[@id="' + id + '"]//h2[contains(@class, "mod-Treffer__name")]')
-    if (title) {
-        try {
-            return { title: title.innerText }
-        } catch (e) { }
-    }
-    return {}
+function extractTitleInfo(element) {
+    return { title: element.innerText.trim() , ...extractGelbeseitenURL(element)};
 }
 
-function decode_b64(str) {
-    return decodeURIComponent(escape(window.atob(str)))
+function extractGelbeseitenURL(element) {
+    return { gelbeSeitenURL: element.parentElement.getAttribute('href') };
 }
 
-async function send_Item(obj) {
-    const msg = {
-        title: '', branche: '', address: '', plz: '', number: '', url: '', googleMaps: ''
-    }
+function extractAddressInfo(element) {
+    const googleMapsURL = element.getAttribute('data-prg');
+    const extractedAddress = googleMapsURL ? extractAddressFromGoogleMapsURL(decodeBase64(googleMapsURL)) : null;
+    return extractedAddress ? {
+        streetAddress: extractedAddress.street,
+        postalCode: extractedAddress.postcode,
+        city: extractedAddress.city,
+        googleMapsURL: encodeURI(decodeBase64(googleMapsURL))
+    } : {};
+}
 
-    Object.assign(msg, obj)
+function capitalizeFirstLetter(string) {
+    return string.charAt(0).toUpperCase() + string.slice(1);
+}
 
-    if(msg.title !== '' || msg.address !== '' || msg.url !== '') 
-        chrome.runtime.sendMessage({ message: { type: "ITEM", obj: msg } }, function (response) {
-            // Exit the script if the response was not ok = true
-            console.log(response)
-            
+async function sendMessageWithData(scrapedData) {
+    const initialMessage = {
+        title: '',
+        industry: '',
+        streetAddress: '',
+        postalCode: '',
+        city: '',
+        phoneNumber: '',
+        website: '',
+        googleMapsURL: '',
+        gelbeSeitenURL: ''
+    };
+
+    Object.assign(initialMessage, scrapedData);
+
+    if (initialMessage.title || initialMessage.streetAddress || initialMessage.website) {
+        chrome.runtime.sendMessage({ message: { type: "ITEM", obj: initialMessage } }, function (response) {
             if (!response['ok']) {
-                console.log('Stop Called')
-                clearInterval(intervalId)
+                clearInterval(scrapingIntervalId);
             }
-
         });
-}
-
-function getElementByXpath(path) {
-    return document.evaluate(path, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-}
-
-async function send_end() {
-    chrome.runtime.sendMessage({ message: { type: "END" } });
+    }
 }
 
 (async () => {
-    await scrape();
+    await startScraping();
 })();
