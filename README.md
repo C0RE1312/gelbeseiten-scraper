@@ -21,13 +21,13 @@ You can choose from json or csv output:
 ```json
 [
   {
-  "title":	"",
-  "industry":	"",
+  "title":	        "",
+  "industry":	      "",
   "streetAddress":	"",
-  "postalCode":	"",
-  "city": "",
-  "phoneNumber":	"",
-  "website":	"",
+  "postalCode":	    "",
+  "city":           "",
+  "phoneNumber":	  "",
+  "website":	      "",
   "googleMapsURL":	"",
   "gelbeSeitenURL": ""
   }
