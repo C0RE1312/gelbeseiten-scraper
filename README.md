@@ -14,7 +14,7 @@ Scraper for gelbeseiten.de
 2. Click on the extension and press start.
 3. When you want to export the files click on stop/export button and select a destination.
 
-## Please reload the gelbeseiten Page before a new scrape!
+## Please reload the gelbeseiten page before a new scrape!
 
 # Output:
 You can choose from json or csv output:
