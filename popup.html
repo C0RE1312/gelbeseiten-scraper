@@ -1,44 +1,44 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Document</title>
-    <style>
-      body {
-        width: 300px;
-        height: 120%;
-        display: flex;
-      }
-    </style>
-  </head>
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gelbeseiten Scraper</title>
+  <style>
+    body {
+      width: 300px;
+      height: auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+  </style>
+</head>
+<body>
+  <div>
+    <h1>Instructions:</h1>
+    <p><strong>1. Visit gelbeseiten.de and start a search.</strong></p>
+    <p><strong>2. Once the results are loaded, press Start.</strong></p>
+    <p>Example URL: https://www.gelbeseiten.de/suche/maler/bundesweit</p>
 
-  <body>
-    <div>
-      Instructions:
-      <p><b>1. Visit gelbeseiten.de and start a search</b></p>
-      <p><b>2. When the results are loaded press on Start</b></p>
-      <p>Example Url: https://www.gelbeseiten.de/suche/maler/bundesweit</p>
-
-      <p>
-        <button id="btn_start">Start</button>
-        <button id="btn_stop" disabled>Stop & Export</button>
-      </p>
-      <p>
-        <p>Please select the output format:</p>
-        <input type="radio" id="json" name="format" value="json" checked="True">
-        <label for="json">json</label><br>
-        <input type="radio" id="csv" name="format" value="csv">
-        <label for="age2">csv</label><br>  
-      </p>
-      <p>
-        <div>counter:</div>
-        <div id="counter">0</div>
-      </p>
-    </div>
-  </body>
+    <p>
+      <button id="btn_start">Start</button>
+      <button id="btn_stop" disabled>Stop & Export</button>
+    </p>
+    <p>
+      <label>Please select the output format:</label><br>
+      <input type="radio" id="json" name="format" value="json" checked>
+      <label for="json">JSON</label><br>
+      <input type="radio" id="csv" name="format" value="csv">
+      <label for="csv">CSV</label>
+    </p>
+    <p>
+      <div>Counter:</div>
+      <div id="counter">0</div>
+    </p>
+  </div>
 
   <script src="./popup-script.js"></script>
-
+</body>
 </html>
