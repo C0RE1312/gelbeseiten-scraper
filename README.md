@@ -1,23 +1,29 @@
-# gelbeseiten-scraper:
-Scraper for gelbeseiten.de
+# Gelbeseiten-Scraper:
+A web scraping chrome extension designed to extract data from gelbeseiten.de. It helps in collecting business leads including fields like title, industry, street address, postal code, city, phone number, website, Google Maps URL, and gelbeSeiten URL.
+
+# Requirements:
+- Google Chrome Browser
+- Developer mode enabled for Chrome extensions
 
 # Installation: 
-1. Download the files and save it in a new folder
-2. Open Chrome and goto: chrome://extensions/
-3. Activate developer mode (on the right)
-4. Click on "Load unpacked" and select the new folder.
-5. The extension should appear in the list :)
+1. Download or clone the repository and extract it into a new folder.
+2. Open Google Chrome and navigate to: chrome://extensions/.
+3. Enable "Developer mode" located at the top-right corner.
+4. Click on "Load unpacked" and navigate to the folder where you extracted the downloaded files.
+5. The extension should now appear in the list of installed Chrome extensions.
 
 
 # Usage: 
-1. Visit http://gelbeseiten.de and start a new search.
-2. Click on the extension and press start.
-3. When you want to export the files click on stop/export button and select a destination.
+1. Open your browser and visit gelbeseiten.de, then initiate a new search for businesses.
+2. Locate and click on the installed extension in your Chrome toolbar, then press the "Start" button.
+3. To stop the scraping process and export the collected data, click on the "Stop/Export" button and choose a destination for the output file.
 
-## Please reload the gelbeseiten page before a new scrape!
+**Important**: Reload the gelbeseiten.de webpage before starting a new scrape.
 
-# Output:
-You can choose from json or csv output:
+# Output Formats:
+You can choose to export the data in either JSON or CSV format.
+
+# JSON Output Sample:
 ```json
 [
   {
@@ -33,6 +39,7 @@ You can choose from json or csv output:
   }
 ]
 ```
+# CSV Output Sample:
 ```csv
 title,industry,streetAddress,postalCode,city,phoneNumber,website,googleMapsURL,gelbeSeitenURL
 ...
