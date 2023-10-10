@@ -44,7 +44,7 @@ async function handleSearchResultItem(searchResultElement) {
             ...extractData('mod-WebseiteKompakt__text', extractWebsiteInfo, elementId, 'span'),
             ...extractData('mod-TelefonnummerKompakt__phoneNumber', extractPhoneNumber, elementId, 'a'),
             ...extractData('besteBranche', extractIndustryInfo, elementId, 'p'),
-            ...extractData('__address', extractAddressInfo, elementId),
+            ...extractData('mod-AdresseKompakt__adress contains-icon-big-adresse', extractAddressInfo, elementId),
             ...extractData('mod-Treffer__name', extractTitleInfo, elementId, 'h2')
         };
         await sendMessageWithData(scrapedData);
