@@ -42,9 +42,11 @@ async function handleSearchResultItem(searchResultElement) {
         const elementId = searchResultElement.id;
         const scrapedData = {
             ...extractData('mod-WebseiteKompakt__text', extractWebsiteInfo, elementId, 'span'),
+            ...extractData('mod-Stars__text data-bewertungen', extractRating, elementId, 'span'),
             ...extractData('mod-TelefonnummerKompakt__phoneNumber', extractPhoneNumber, elementId, 'a'),
             ...extractData('besteBranche', extractIndustryInfo, elementId, 'p'),
             ...extractData('mod-AdresseKompakt__adress contains-icon-big-adresse', extractAddressInfo, elementId),
+            ...extractData('mod-AdresseKompakt__entfernung', extractDistance, elementId, 'span'),
             ...extractData('mod-Treffer__name', extractTitleInfo, elementId, 'h2')
         };
         await sendMessageWithData(scrapedData);
@@ -93,6 +95,14 @@ function extractAddressInfo(element) {
     } : {};
 }
 
+function extractDistance(element) {
+    return { distance: element.innerText.trim()};
+}
+
+function extractRating(element) {
+    return { rating: element.innerText.trim()};
+}
+
 function capitalizeFirstLetter(string) {
     return string.charAt(0).toUpperCase() + string.slice(1);
 }
@@ -100,8 +110,10 @@ function capitalizeFirstLetter(string) {
 async function sendMessageWithData(scrapedData) {
     const initialMessage = {
         title: '',
+        rating: '',
         industry: '',
         streetAddress: '',
+        distance: '',
         postalCode: '',
         city: '',
         phoneNumber: '',
