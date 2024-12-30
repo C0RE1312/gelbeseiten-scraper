@@ -1,5 +1,8 @@
-# Gelbeseiten-Scraper:
+# Gelbeseiten Scraper:
 A web scraping chrome extension designed to extract data from gelbeseiten.de. It helps in collecting business leads including fields like title, industry, street address, postal code, city, phone number, website, Google Maps URL, distance, rating and gelbeSeiten URL.
+
+> [!NOTE]
+> **Looking for custom web scraping or browser automation? Reach out at [https://rapidcode.dev](https://rapidcode.dev)**
 
 # Requirements:
 - Google Chrome Browser
