@@ -49,6 +49,14 @@ async function handleSearchResultItem(searchResultElement) {
             ...extractData('mod-AdresseKompakt__entfernung', extractDistance, elementId, 'span'),
             ...extractData('mod-Treffer__name', extractTitleInfo, elementId, 'h2')
         };
+        
+        if (scrapedData.gelbeSeitenURL) {
+            const emailAddress = await fetchEmailFromDetailPage(scrapedData.gelbeSeitenURL);
+            if (emailAddress) {
+                scrapedData.emailAddress = emailAddress;
+            }
+        }
+        
         await sendMessageWithData(scrapedData);
     } catch (error) {
         console.log(error);
@@ -107,6 +115,32 @@ function capitalizeFirstLetter(string) {
     return string.charAt(0).toUpperCase() + string.slice(1);
 }
 
+async function fetchEmailFromDetailPage(detailPageUrl) {
+    try {
+        const response = await fetch(detailPageUrl);
+        const html = await response.text();
+        
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        
+        const emailButton = doc.querySelector('#email_versenden.button');
+        
+        if (emailButton) {
+            const mailtoLink = emailButton.getAttribute('data-link');
+            
+            if (mailtoLink && mailtoLink.startsWith('mailto:')) {
+                const emailAddress = mailtoLink.substring(7, mailtoLink.indexOf('?'));
+                return emailAddress;
+            }
+        }
+        
+        return null;
+    } catch (error) {
+        console.error("Fehler beim Abrufen der E-Mail-Adresse:", error);
+        return null;
+    }
+}
+
 async function sendMessageWithData(scrapedData) {
     const initialMessage = {
         title: '',
@@ -119,7 +153,8 @@ async function sendMessageWithData(scrapedData) {
         phoneNumber: '',
         website: '',
         googleMapsURL: '',
-        gelbeSeitenURL: ''
+        gelbeSeitenURL: '',
+        emailAddress: ''
     };
 
     Object.assign(initialMessage, scrapedData);
