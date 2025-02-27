@@ -10,11 +10,11 @@
         "default_popup": "./popup.html"
     },
     "permissions": [
-        "storage",
         "activeTab",
-        "scripting",
         "tabs",
-        "https://www.gelbeseiten.de/*"
+        "scripting",
+        "storage",
+        "downloads"
     ],
     "host_permissions": [
         "https://www.gelbeseiten.de/*"
