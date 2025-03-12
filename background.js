@@ -92,3 +92,11 @@ function download(data, filename, type) {
         }
     });
 }
+
+function convertToCSV(data) {
+    const header = "title,rating,industry,streetAddress,postalCode,city,phoneNumber,website,googleMapsURL,gelbeSeitenURL,emailAddress";
+    const rows = data.map(item => 
+        `${item.title},${item.rating},${item.industry},${item.streetAddress},${item.postalCode},${item.city},${item.phoneNumber},${item.website},${item.googleMapsURL},${item.gelbeSeitenURL},${item.emailAddress}`
+    );
+    return [header, ...rows].join('\n');
+}
