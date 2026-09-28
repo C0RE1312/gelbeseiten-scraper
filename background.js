@@ -156,6 +156,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 async function handleMessage(request, sender) {
     if (request.message === 'start_scraping') return startScraping();
     if (request.message === 'stop_scraping') return stopAndExport(request.type);
+    if (request.message === 'reset_scraping') return resetScraping();
     if (request.message === 'get_status') {
         const state = await getState();
         const itemCount = await countItems();
@@ -251,6 +252,26 @@ async function stopAndExport(type = 'json') {
 
     await exportItems(items, type);
     return { ok: true, active: false, itemCount: items.length };
+}
+
+async function resetScraping() {
+    const state = await getState();
+
+    await setState({ active: false });
+    if (state.tabId) {
+        await sendTabMessage(state.tabId, { type: 'STOP_SCRAPING' });
+    }
+
+    await clearItems();
+    const nextState = await setState({
+        active: false,
+        itemCount: 0,
+        tabId: null,
+        runId: null
+    });
+    notifyState(nextState);
+
+    return { ok: true, ...nextState };
 }
 
 function notifyState(state) {

@@ -1,9 +1,11 @@
 const startButton = document.getElementById('btn_start');
 const stopButton = document.getElementById('btn_stop');
+const resetButton = document.getElementById('btn_reset');
 const counter = document.getElementById('counter');
 
 startButton.addEventListener('click', start);
 stopButton.addEventListener('click', stop);
+resetButton.addEventListener('click', reset);
 
 chrome.runtime.onMessage.addListener(request => {
     if (request.message === 'COUNTER_UPDATED') {
@@ -62,8 +64,28 @@ async function stop() {
     }
 }
 
+async function reset() {
+    if (!window.confirm('Stop scraping and permanently delete all collected items?')) return;
+
+    startButton.disabled = true;
+    stopButton.disabled = true;
+    resetButton.disabled = true;
+
+    try {
+        const response = await chrome.runtime.sendMessage({ message: 'reset_scraping' });
+        if (!response?.ok) throw new Error(response?.error || 'Could not reset scraper data.');
+
+        counter.innerText = '0';
+        setScraperState(false, 0);
+    } catch (error) {
+        console.error(error);
+        await refreshStatus();
+    }
+}
+
 function setScraperState(active, itemCount) {
     startButton.disabled = active;
     stopButton.disabled = !active && itemCount === 0;
+    resetButton.disabled = !active && itemCount === 0;
     stopButton.innerText = active ? 'Stop & Export' : 'Export';
 }
