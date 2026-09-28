@@ -1,173 +1,255 @@
-let scrapingIntervalId = 0;
+(() => {
+    if (globalThis.__gelbeSeitenScraperInstalled) return;
+    globalThis.__gelbeSeitenScraperInstalled = true;
 
-const executeXPathQuery = (xpathQuery) => document.evaluate(xpathQuery, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+    let scrapingActive = false;
+    let currentRunId = null;
+    let emailRequestController = null;
+    let cancelNextPageWait = null;
 
-const decodeBase64 = (base64String) => decodeURIComponent(escape(window.atob(base64String)));
+    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+        if (request.type === 'START_SCRAPING') {
+            if (scrapingActive) {
+                sendResponse({ ok: false, error: 'Scraping is already active.' });
+                return;
+            }
 
-function extractAddressFromGoogleMapsURL(googleMapsURL) {
-  try {
-    const url = new URL(googleMapsURL);
-    const placeParam = url.pathname.split('/').pop();
-    const [_, street, postcode, city] = /(.+),\s+(\d+)\s+(.+)/.exec(decodeURIComponent(placeParam)) || [];
-    
-    return {
-      street,
-      postcode,
-      city
-    };
-  } catch (error) {
-    console.error("An error occurred while extracting the address:", error);
-    return null;
-  }
-}
-
-async function startScraping() {
-    scrapingIntervalId = setInterval(async () => {
-        const searchResultsContainer = document.getElementById("gs_treffer");
-        for (let childElement of searchResultsContainer.children) {
-            await handleSearchResultItem(childElement);
+            currentRunId = request.runId;
+            scrapingActive = true;
+            sendResponse({ ok: true });
+            startScraping(request.runId);
+        } else if (request.type === 'STOP_SCRAPING') {
+            scrapingActive = false;
+            emailRequestController?.abort();
+            cancelNextPageWait?.();
+            sendResponse({ ok: true });
         }
-        await navigateToNextPage();
-    }, 250);
-}
+    });
 
-async function navigateToNextPage() {
-    const nextButton = document.getElementById('mod-LoadMore--button');
-    nextButton ? nextButton.click() : clearInterval(scrapingIntervalId);
-}
+    const executeXPathQuery = xpathQuery => document.evaluate(
+        xpathQuery,
+        document,
+        null,
+        XPathResult.FIRST_ORDERED_NODE_TYPE,
+        null
+    ).singleNodeValue;
 
-async function handleSearchResultItem(searchResultElement) {
-    searchResultElement.scrollIntoView();
-    try {
-        const elementId = searchResultElement.id;
-        const scrapedData = {
-            ...extractData('mod-WebseiteKompakt__text', extractWebsiteInfo, elementId, 'span'),
-            ...extractData('mod-Stars__text data-bewertungen', extractRating, elementId, 'span'),
-            ...extractData('mod-TelefonnummerKompakt__phoneNumber', extractPhoneNumber, elementId, 'a'),
-            ...extractData('besteBranche', extractIndustryInfo, elementId, 'p'),
-            ...extractData('mod-AdresseKompakt__adress contains-icon-big-adresse', extractAddressInfo, elementId),
-            ...extractData('mod-AdresseKompakt__entfernung', extractDistance, elementId, 'span'),
-            ...extractData('mod-Treffer__name', extractTitleInfo, elementId, 'h2')
-        };
-        
-        if (scrapedData.gelbeSeitenURL) {
-            const emailAddress = await fetchEmailFromDetailPage(scrapedData.gelbeSeitenURL);
-            if (emailAddress) {
-                scrapedData.emailAddress = emailAddress;
+    const decodeBase64 = base64String => decodeURIComponent(escape(window.atob(base64String)));
+
+    async function startScraping(runId) {
+        try {
+            while (scrapingActive && currentRunId === runId) {
+                const searchResultsContainer = document.getElementById('gs_treffer');
+                if (!searchResultsContainer) {
+                    throw new Error('Search results container was not found.');
+                }
+
+                const resultElements = [...searchResultsContainer.children];
+                for (const childElement of resultElements) {
+                    if (!scrapingActive || currentRunId !== runId) break;
+                    await handleSearchResultItem(childElement, runId);
+                }
+
+                if (!scrapingActive || currentRunId !== runId) break;
+                const hasNextPage = await loadNextPage(searchResultsContainer);
+                if (!hasNextPage) break;
+            }
+        } catch (error) {
+            if (error.name !== 'AbortError') {
+                console.error('Scraping stopped because of an error:', error);
+            }
+        } finally {
+            if (currentRunId === runId) {
+                scrapingActive = false;
+                emailRequestController = null;
+                chrome.runtime.sendMessage({
+                    message: { type: 'SCRAPING_FINISHED', runId }
+                }).catch(() => {});
             }
         }
-        
-        await sendMessageWithData(scrapedData);
-    } catch (error) {
-        console.log(error);
-    } finally {
-        searchResultElement.remove();
     }
-    await new Promise(resolve => setTimeout(resolve, 25));
-}
 
-function extractWebsiteInfo(element) {
-    const encodedWebsiteURL = element.getAttribute('data-webseitelink');
-    return encodedWebsiteURL ? { website: decodeBase64(encodedWebsiteURL) } : {};
-}
+    async function loadNextPage(searchResultsContainer) {
+        const nextButton = document.getElementById('mod-LoadMore--button');
+        if (!nextButton) return false;
 
-function extractData(className, extractionFunction, elementId, tagName = 'div') {
-    const targetedElement = executeXPathQuery(`//article[@id="${elementId}"]//${tagName}[contains(@class, "${className}")]`);
-    return targetedElement ? extractionFunction(targetedElement) : {};
-}
+        const existingChildren = new Set(searchResultsContainer.children);
+        nextButton.click();
 
-function extractPhoneNumber(element) {
-    return { phoneNumber: element.innerText.trim() };
-}
-
-function extractIndustryInfo(element) {
-    return { industry: capitalizeFirstLetter(element.innerText.trim().toLowerCase()) };
-}
-
-function extractTitleInfo(element) {
-    return { title: element.innerText.trim() , ...extractGelbeseitenURL(element)};
-}
-
-function extractGelbeseitenURL(element) {
-    return { gelbeSeitenURL: element.parentElement.getAttribute('href') };
-}
-
-function extractAddressInfo(element) {
-    const googleMapsURL = element.getAttribute('data-prg');
-    const extractedAddress = googleMapsURL ? extractAddressFromGoogleMapsURL(decodeBase64(googleMapsURL)) : null;
-    return extractedAddress ? {
-        streetAddress: extractedAddress.street,
-        postalCode: extractedAddress.postcode,
-        city: extractedAddress.city,
-        googleMapsURL: encodeURI(decodeBase64(googleMapsURL))
-    } : {};
-}
-
-function extractDistance(element) {
-    return { distance: element.innerText.trim()};
-}
-
-function extractRating(element) {
-    return { rating: element.innerText.trim()};
-}
-
-function capitalizeFirstLetter(string) {
-    return string.charAt(0).toUpperCase() + string.slice(1);
-}
-
-async function fetchEmailFromDetailPage(detailPageUrl) {
-    try {
-        const response = await fetch(detailPageUrl);
-        const html = await response.text();
-        
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
-        
-        const emailButton = doc.querySelector('#email_versenden.button');
-        
-        if (emailButton) {
-            const mailtoLink = emailButton.getAttribute('data-link');
-            
-            if (mailtoLink && mailtoLink.startsWith('mailto:')) {
-                const emailAddress = mailtoLink.substring(7, mailtoLink.indexOf('?'));
-                return emailAddress;
-            }
-        }
-        
-        return null;
-    } catch (error) {
-        console.error("Fehler beim Abrufen der E-Mail-Adresse:", error);
-        return null;
+        return waitForNewResults(searchResultsContainer, existingChildren, 15000);
     }
-}
 
-async function sendMessageWithData(scrapedData) {
-    const initialMessage = {
-        title: '',
-        rating: '',
-        industry: '',
-        streetAddress: '',
-        distance: '',
-        postalCode: '',
-        city: '',
-        phoneNumber: '',
-        website: '',
-        googleMapsURL: '',
-        gelbeSeitenURL: '',
-        emailAddress: ''
-    };
+    function waitForNewResults(container, existingChildren, timeoutMs) {
+        return new Promise(resolve => {
+            let settled = false;
+            let cancelWait;
+            const finish = value => {
+                if (settled) return;
+                settled = true;
+                observer.disconnect();
+                clearTimeout(timeoutId);
+                if (cancelNextPageWait === cancelWait) cancelNextPageWait = null;
+                resolve(value);
+            };
+            cancelWait = () => finish(false);
+            cancelNextPageWait = cancelWait;
+            const hasNewResults = () => [...container.children].some(child => !existingChildren.has(child));
+            const observer = new MutationObserver(() => {
+                if (!scrapingActive) {
+                    finish(false);
+                } else if (hasNewResults()) {
+                    finish(true);
+                }
+            });
+            const timeoutId = setTimeout(() => finish(hasNewResults()), timeoutMs);
 
-    Object.assign(initialMessage, scrapedData);
-
-    if (initialMessage.title || initialMessage.streetAddress || initialMessage.website) {
-        chrome.runtime.sendMessage({ message: { type: "ITEM", obj: initialMessage } }, function (response) {
-            if (!response['ok']) {
-                clearInterval(scrapingIntervalId);
-            }
+            observer.observe(container, { childList: true });
+            if (hasNewResults()) finish(true);
         });
     }
-}
 
-(async () => {
-    await startScraping();
+    async function handleSearchResultItem(searchResultElement, runId) {
+        searchResultElement.scrollIntoView();
+
+        try {
+            const elementId = searchResultElement.id;
+            const scrapedData = {
+                ...extractData('mod-WebseiteKompakt__text', extractWebsiteInfo, elementId, 'span'),
+                ...extractData('mod-Stars__text data-bewertungen', extractRating, elementId, 'span'),
+                ...extractData('mod-TelefonnummerKompakt__phoneNumber', extractPhoneNumber, elementId, 'a'),
+                ...extractData('besteBranche', extractIndustryInfo, elementId, 'p'),
+                ...extractData('mod-AdresseKompakt__adress contains-icon-big-adresse', extractAddressInfo, elementId),
+                ...extractData('mod-AdresseKompakt__entfernung', extractDistance, elementId, 'span'),
+                ...extractData('mod-Treffer__name', extractTitleInfo, elementId, 'h2')
+            };
+
+            if (scrapedData.gelbeSeitenURL && scrapingActive) {
+                const emailAddress = await fetchEmailFromDetailPage(scrapedData.gelbeSeitenURL);
+                if (emailAddress) scrapedData.emailAddress = emailAddress;
+            }
+
+            if (scrapingActive && currentRunId === runId) {
+                const response = await sendMessageWithData(scrapedData, runId);
+                if (!response?.ok) scrapingActive = false;
+            }
+        } catch (error) {
+            if (error.name !== 'AbortError') console.error(error);
+        } finally {
+            searchResultElement.remove();
+        }
+    }
+
+    function extractAddressFromGoogleMapsURL(googleMapsURL) {
+        try {
+            const url = new URL(googleMapsURL);
+            const placeParam = url.pathname.split('/').pop();
+            const [, street, postcode, city] = /(.+),\s+(\d+)\s+(.+)/.exec(decodeURIComponent(placeParam)) || [];
+            return { street, postcode, city };
+        } catch (error) {
+            console.error('An error occurred while extracting the address:', error);
+            return null;
+        }
+    }
+
+    function extractWebsiteInfo(element) {
+        const encodedWebsiteURL = element.getAttribute('data-webseitelink');
+        return encodedWebsiteURL ? { website: decodeBase64(encodedWebsiteURL) } : {};
+    }
+
+    function extractData(className, extractionFunction, elementId, tagName = 'div') {
+        const targetedElement = executeXPathQuery(`//article[@id="${elementId}"]//${tagName}[contains(@class, "${className}")]`);
+        return targetedElement ? extractionFunction(targetedElement) : {};
+    }
+
+    function extractPhoneNumber(element) {
+        return { phoneNumber: element.innerText.trim() };
+    }
+
+    function extractIndustryInfo(element) {
+        return { industry: capitalizeFirstLetter(element.innerText.trim().toLowerCase()) };
+    }
+
+    function extractTitleInfo(element) {
+        return { title: element.innerText.trim(), ...extractGelbeseitenURL(element) };
+    }
+
+    function extractGelbeseitenURL(element) {
+        return { gelbeSeitenURL: element.parentElement.getAttribute('href') };
+    }
+
+    function extractAddressInfo(element) {
+        const googleMapsURL = element.getAttribute('data-prg');
+        const decodedURL = googleMapsURL ? decodeBase64(googleMapsURL) : null;
+        const extractedAddress = decodedURL ? extractAddressFromGoogleMapsURL(decodedURL) : null;
+        return extractedAddress ? {
+            streetAddress: extractedAddress.street,
+            postalCode: extractedAddress.postcode,
+            city: extractedAddress.city,
+            googleMapsURL: encodeURI(decodedURL)
+        } : {};
+    }
+
+    function extractDistance(element) {
+        return { distance: element.innerText.trim() };
+    }
+
+    function extractRating(element) {
+        return { rating: element.innerText.trim() };
+    }
+
+    function capitalizeFirstLetter(string) {
+        return string.charAt(0).toUpperCase() + string.slice(1);
+    }
+
+    async function fetchEmailFromDetailPage(detailPageUrl) {
+        emailRequestController = new AbortController();
+        const timeoutId = setTimeout(() => emailRequestController?.abort(), 15000);
+
+        try {
+            const response = await fetch(detailPageUrl, { signal: emailRequestController.signal });
+            if (!response.ok) return null;
+
+            const html = await response.text();
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            const mailtoLink = doc.querySelector('#email_versenden.button')?.getAttribute('data-link');
+
+            if (!mailtoLink?.startsWith('mailto:')) return null;
+            const queryIndex = mailtoLink.indexOf('?');
+            return mailtoLink.substring(7, queryIndex === -1 ? mailtoLink.length : queryIndex);
+        } catch (error) {
+            if (error.name !== 'AbortError') {
+                console.error('Fehler beim Abrufen der E-Mail-Adresse:', error);
+            }
+            return null;
+        } finally {
+            clearTimeout(timeoutId);
+            emailRequestController = null;
+        }
+    }
+
+    function sendMessageWithData(scrapedData, runId) {
+        const item = {
+            title: '',
+            rating: '',
+            industry: '',
+            streetAddress: '',
+            distance: '',
+            postalCode: '',
+            city: '',
+            phoneNumber: '',
+            website: '',
+            googleMapsURL: '',
+            gelbeSeitenURL: '',
+            emailAddress: '',
+            ...scrapedData
+        };
+
+        if (!item.title && !item.streetAddress && !item.website) {
+            return Promise.resolve({ ok: true, skipped: true });
+        }
+
+        return chrome.runtime.sendMessage({
+            message: { type: 'ITEM', obj: item, runId }
+        });
+    }
 })();
