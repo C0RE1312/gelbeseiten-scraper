@@ -1,6 +1,8 @@
 # Logs
 logs
 *.log
+.idea/
+.serena/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
