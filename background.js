@@ -127,7 +127,8 @@ async function getState() {
         active: false,
         itemCount: 0,
         tabId: null,
-        runId: null
+        runId: null,
+        includeEmails: false
     };
 }
 
@@ -154,7 +155,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 async function handleMessage(request, sender) {
-    if (request.message === 'start_scraping') return startScraping();
+    if (request.message === 'start_scraping') return startScraping(request.includeEmails === true);
     if (request.message === 'stop_scraping') return stopAndExport(request.type);
     if (request.message === 'reset_scraping') return resetScraping();
     if (request.message === 'get_status') {
@@ -180,7 +181,7 @@ async function handleMessage(request, sender) {
     return { ok: false, error: 'Unknown message' };
 }
 
-async function startScraping() {
+async function startScraping(includeEmails) {
     const tabs = await chrome.tabs.query({
         active: true,
         currentWindow: true,
@@ -199,14 +200,18 @@ async function startScraping() {
     }
 
     await clearItems();
-    await setState({ active: true, itemCount: 0, tabId, runId });
+    await setState({ active: true, itemCount: 0, tabId, runId, includeEmails });
 
     try {
         await chrome.scripting.executeScript({
             target: { tabId },
             files: ['scraper-script.js']
         });
-        const response = await chrome.tabs.sendMessage(tabId, { type: 'START_SCRAPING', runId });
+        const response = await chrome.tabs.sendMessage(tabId, {
+            type: 'START_SCRAPING',
+            runId,
+            includeEmails
+        });
         if (!response?.ok) {
             throw new Error(response?.error || 'The page did not start the scraper.');
         }
@@ -267,7 +272,8 @@ async function resetScraping() {
         active: false,
         itemCount: 0,
         tabId: null,
-        runId: null
+        runId: null,
+        includeEmails: false
     });
     notifyState(nextState);
 
@@ -278,7 +284,8 @@ function notifyState(state) {
     chrome.runtime.sendMessage({
         message: 'SCRAPER_STATE_UPDATED',
         active: state.active,
-        itemCount: state.itemCount
+        itemCount: state.itemCount,
+        includeEmails: state.includeEmails
     }).catch(() => {
         // The popup is normally closed while a scrape is running.
     });

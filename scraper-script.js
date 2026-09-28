@@ -4,6 +4,7 @@
 
     let scrapingActive = false;
     let currentRunId = null;
+    let includeEmails = false;
     let emailRequestController = null;
     let cancelNextPageWait = null;
 
@@ -15,6 +16,7 @@
             }
 
             currentRunId = request.runId;
+            includeEmails = request.includeEmails === true;
             scrapingActive = true;
             sendResponse({ ok: true });
             startScraping(request.runId);
@@ -123,7 +125,7 @@
                 ...extractData('mod-Treffer__name', extractTitleInfo, elementId, 'h2')
             };
 
-            if (scrapedData.gelbeSeitenURL && scrapingActive) {
+            if (includeEmails && scrapedData.gelbeSeitenURL && scrapingActive) {
                 const emailAddress = await fetchEmailFromDetailPage(scrapedData.gelbeSeitenURL);
                 if (emailAddress) scrapedData.emailAddress = emailAddress;
             }

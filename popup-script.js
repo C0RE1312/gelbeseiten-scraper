@@ -2,6 +2,7 @@ const startButton = document.getElementById('btn_start');
 const stopButton = document.getElementById('btn_stop');
 const resetButton = document.getElementById('btn_reset');
 const counter = document.getElementById('counter');
+const includeEmailsCheckbox = document.getElementById('include_emails');
 
 startButton.addEventListener('click', start);
 stopButton.addEventListener('click', stop);
@@ -12,6 +13,7 @@ chrome.runtime.onMessage.addListener(request => {
         counter.innerText = String(request.count);
     } else if (request.message === 'SCRAPER_STATE_UPDATED') {
         counter.innerText = String(request.itemCount);
+        includeEmailsCheckbox.checked = request.active && request.includeEmails === true;
         setScraperState(request.active, request.itemCount);
     }
 });
@@ -24,6 +26,7 @@ async function refreshStatus() {
         if (!status?.ok) throw new Error(status?.error || 'Could not read scraper status.');
 
         counter.innerText = String(status.itemCount);
+        includeEmailsCheckbox.checked = status.active && status.includeEmails === true;
         setScraperState(status.active, status.itemCount);
     } catch (error) {
         console.error(error);
@@ -36,7 +39,10 @@ async function start() {
     counter.innerText = '0';
 
     try {
-        const response = await chrome.runtime.sendMessage({ message: 'start_scraping' });
+        const response = await chrome.runtime.sendMessage({
+            message: 'start_scraping',
+            includeEmails: includeEmailsCheckbox.checked
+        });
         if (!response?.ok) throw new Error(response?.error || 'Could not start scraping.');
         setScraperState(true, 0);
     } catch (error) {
@@ -57,6 +63,7 @@ async function stop() {
         if (!response?.ok) throw new Error(response?.error || 'Could not export results.');
 
         counter.innerText = String(response.itemCount);
+        includeEmailsCheckbox.checked = false;
         setScraperState(false, response.itemCount);
     } catch (error) {
         console.error(error);
@@ -76,6 +83,7 @@ async function reset() {
         if (!response?.ok) throw new Error(response?.error || 'Could not reset scraper data.');
 
         counter.innerText = '0';
+        includeEmailsCheckbox.checked = false;
         setScraperState(false, 0);
     } catch (error) {
         console.error(error);
@@ -87,5 +95,6 @@ function setScraperState(active, itemCount) {
     startButton.disabled = active;
     stopButton.disabled = !active && itemCount === 0;
     resetButton.disabled = !active && itemCount === 0;
+    includeEmailsCheckbox.disabled = active;
     stopButton.innerText = active ? 'Stop & Export' : 'Export';
 }
